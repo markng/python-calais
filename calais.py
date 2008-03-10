@@ -9,7 +9,7 @@ CALAIS_URL="http://api.opencalais.com/enlighten/calais.asmx/Enlighten"
 API_KEY = "*PUT YOUR CALAIS API KEY HERE*"
 PARAMS_XML = """
 <c:params xmlns:c="http://s.opencalais.com/1/pred/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"> 
-<c:processingDirectives c:contentType="text/txt" c:outputFormat="xml/rdf"> 
+<c:processingDirectives c:contentType="%s" c:outputFormat="xml/rdf"> 
 </c:processingDirectives> 
 <c:userDirectives c:allowDistribution="%s" c:allowSearch="%s" c:externalID="%s" c:submitter="%s"> 
 </c:userDirectives> 
@@ -23,7 +23,6 @@ class Calais:
 	allow_distro = "false"
 	allow_search = "false" 
 	things = {}
-	rdfdoc = ""
 	def __init__(self, submitter="Calais.py", allow_distro="false", allow_search="false"):
 		self.submitter = submitter
 		self.allow_distro = "false"
@@ -36,19 +35,25 @@ class Calais:
 		for i in range(10):
 			np = np + choice(chars)
 		return np
+		
+	def content_id(self, text):
+		import hashlib
+		h = hashlib.sha1()
+		h.update(text)
+		return h.hexdigest()
 	
-	def analyze(self, text): 
-		externalID = self.random_id()
-		paramsXML = PARAMS_XML % (self.allow_distro, self.allow_search, externalID, self.submitter) 
+	def analyze(self, text, content_type="text/txt"): 
+		externalID = self.content_id(text)
+		paramsXML = PARAMS_XML % (content_type, self.allow_distro, self.allow_search, externalID, self.submitter) 
 		param = urllib.urlencode({'licenseID':API_KEY, 'content':text, 'paramsXML':paramsXML}) 
 		f = urllib.urlopen(CALAIS_URL, param) 
 		response = f.read() 
 		dom = minidom.parseString(response) 
-		self.rdfdoc = dom.childNodes[0].childNodes[0].nodeValue 
+		rdfdoc = dom.childNodes[0].childNodes[0].nodeValue 
 		rdf = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#") 
 		c = Namespace("http://s.opencalais.com/1/pred/") 
 		g = Graph() 
-		g.parse(StringIO(self.rdfdoc)) 
+		g.parse(StringIO(rdfdoc.encode('utf-8'))) 
 		for so in g.subject_objects(c["name"]):
 			(hash, lit) = so
 			name = lit.title()
@@ -64,6 +69,11 @@ class Calais:
 	def print_things(self): 
 		for (hash, thing) in self.things.items(): 
 			print "%s :: %s (%s)" % (hash, thing["name"], thing["type"])
+			
+	def analyze_url(self, url):
+		f = urllib.urlopen(url)
+		html = f.read()
+		self.analyze(html, "text/html")
 
 # Usage:
 #

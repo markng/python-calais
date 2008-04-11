@@ -1,3 +1,19 @@
+"""
+
+Usage:
+
+> calais = Calais(submitter="MyProjectID", api_key="your-opencalais-api-key")
+> text = "some text"
+> calais.analyze(text)
+> calais.print_things()
+
+or
+
+> calais.analyze_url("http://some-url/")
+> calais.print_things()
+
+"""
+
 from random import choice
 from xml.dom import minidom
 from StringIO import StringIO
@@ -96,9 +112,3 @@ class Calais:
 		f = urllib.urlopen(url)
 		html = f.read()
 		self.analyze(html, "text/html")
-
-# Usage:
-#
-#calais = Calais(submitter="MyProjectID", api_key="xxyyxyxyxyyyxxyx")
-#calais.analyze(text)
-#calais.print_things()

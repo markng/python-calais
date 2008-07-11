@@ -1,4 +1,6 @@
 """
+python-calais v.0.2
+Author: Jordan Dimov (jdimov@mlke.net)
 
 Usage:
 
@@ -9,8 +11,17 @@ Usage:
 
 or
 
+> calais.getAnalysis(text, "text/txt", "Text/Simple")
+
+or
+
 > calais.analyze_url("http://some-url/")
 > calais.print_things()
+
+or
+
+> calais.getURLAnalysis("http://www.csc.liv.ac.uk/semanticweb", "Text/Simple")
+
 
 """
 
@@ -24,7 +35,7 @@ from rdflib import Namespace
 CALAIS_URL="http://api.opencalais.com/enlighten/calais.asmx/Enlighten"
 PARAMS_XML = """
 <c:params xmlns:c="http://s.opencalais.com/1/pred/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"> 
-<c:processingDirectives c:contentType="%s" c:outputFormat="xml/rdf"> 
+<c:processingDirectives c:contentType="%s" c:outputFormat="%s"> 
 </c:processingDirectives> 
 <c:userDirectives c:allowDistribution="%s" c:allowSearch="%s" c:externalID="%s" c:submitter="%s"> 
 </c:userDirectives> 
@@ -76,7 +87,7 @@ class Calais:
 		"""
 		self.things = {}
 		externalID = self.content_id(text)
-		paramsXML = PARAMS_XML % (content_type, self.allow_distro, self.allow_search, externalID, self.submitter) 
+		paramsXML = PARAMS_XML % (content_type, "XML/RDF",self.allow_distro, self.allow_search, externalID, self.submitter) 
 		param = urllib.urlencode({'licenseID':self.api_key, 'content':text, 'paramsXML':paramsXML}) 
 		f = urllib.urlopen(CALAIS_URL, param) 
 		response = f.read() 
@@ -112,3 +123,23 @@ class Calais:
 		f = urllib.urlopen(url)
 		html = f.read()
 		self.analyze(html, "text/html")
+
+	def getURLAnalysis(self, url, outputFormat):
+		"""
+		Downloads HTML from given URL, submits it to OpenCalais for analysis, with results supplied in given format.
+		"""
+		f=urllib.urlopen(url)
+		html = f.read()
+		return self.getAnalysis(html, "text/html",outputFormat)
+
+	def getAnalysis(self, text, content_type="text/txt", outputFormat="XML/RDF"):
+		"""
+		Submits 'text' to OpenCalais for analysis and returns 'response' in chosen format.  'content_type' defaults to 'text/txt'.  Set it to 'text/html' if you are submitting HTML data. 
+		'outputFormat' defaults to "XML/RDF".
+		"""
+		externalID = self.content_id(text)
+		paramsXML = PARAMS_XML % (content_type, outputFormat, self.allow_distro, self.allow_search, externalID, self.submitter) 
+		param = urllib.urlencode({'licenseID':self.api_key, 'content':text, 'paramsXML':paramsXML}) 
+		f = urllib.urlopen(CALAIS_URL, param) 
+		response = f.read()
+		return response

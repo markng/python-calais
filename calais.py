@@ -1,145 +1,130 @@
 """
-python-calais v.0.2
+python-calais v.1.0 -- Python interface to the OpenCalais API
 Author: Jordan Dimov (jdimov@mlke.net)
-
-Usage:
-
-> calais = Calais(submitter="MyProjectID", api_key="your-opencalais-api-key")
-> text = "some text"
-> calais.analyze(text)
-> calais.print_things()
-
-or
-
-> calais.getAnalysis(text, "text/txt", "Text/Simple")
-
-or
-
-> calais.analyze_url("http://some-url/")
-> calais.print_things()
-
-or
-
-> calais.getURLAnalysis("http://www.csc.liv.ac.uk/semanticweb", "Text/Simple")
-
-
+Last-Update: 01/09/2009
 """
 
-from random import choice
-from xml.dom import minidom
+import httplib, urllib
+import simplejson as json
 from StringIO import StringIO
-import urllib, string
-from rdflib import ConjunctiveGraph as Graph
-from rdflib import Namespace
 
-CALAIS_URL="http://api.opencalais.com/enlighten/calais.asmx/Enlighten"
 PARAMS_XML = """
-<c:params xmlns:c="http://s.opencalais.com/1/pred/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"> 
-<c:processingDirectives c:contentType="%s" c:outputFormat="%s"> 
-</c:processingDirectives> 
-<c:userDirectives c:allowDistribution="%s" c:allowSearch="%s" c:externalID="%s" c:submitter="%s"> 
-</c:userDirectives> 
-<c:externalMetadata> 
-</c:externalMetadata> 
-</c:params>
+<c:params xmlns:c="http://s.opencalais.com/1/pred/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"> <c:processingDirectives %s> </c:processingDirectives> <c:userDirectives %s> </c:userDirectives> <c:externalMetadata %s> </c:externalMetadata> </c:params>
 """
 
-class Calais:
-	submitter = "Calais.py"
-	allow_distro = "false"
-	allow_search = "false" 
-	things = {}
-	api_key = ""
-	def __init__(self, submitter, api_key, allow_distro="false", allow_search="false"):
-		"""
-		Creates a new handler for communicating with OpenCalais.  The parameter 'submitter' must contain a string, identifying your application.  'api_key' must contain a string with your OpenCalais API key (get it here: http://developer.opencalais.com/apps/register).  
-		The optional parameter 'allow_distro', if set to 'true' gives OpenCalais permission to distribute the metadata extracted from your submissions.  The default value for 'allow_distro' is 'false'.  
-		The optional parameter 'allow_search', if set to 'true' tells OpenCalais that future searches can be performed on the extracted metadata.  The default value for 'allow_search' is 'false'.  
-		"""
-		self.submitter = submitter
-		self.allow_distro = "false"
-		self.allow_search = "false"
-		self.api_key = api_key
-		self.things = {}
-	
-	def random_id(self):
-		"""
-		Creates a random 10-character ID for your submission.  
-		"""
-		chars = string.letters + string.digits
-		np = ""
-		for i in range(10):
-			np = np + choice(chars)
-		return np
-		
-	def content_id(self, text):
-		"""
-		Creates a SHA1 hash of the text of your submission.  
-		"""
-		import hashlib
-		h = hashlib.sha1()
-		h.update(text)
-		return h.hexdigest()
-	
-	def analyze(self, text, content_type="text/txt"): 
-		"""
-		Submits 'text' to OpenCalais for analysis and memorizes the extracted metadata.  'content_type' defaults to 'text/txt'.  Set it to 'text/html' if you are submitting HTML data.  
-		"""
-		self.things = {}
-		externalID = self.content_id(text)
-		paramsXML = PARAMS_XML % (content_type, "XML/RDF",self.allow_distro, self.allow_search, externalID, self.submitter) 
-		param = urllib.urlencode({'licenseID':self.api_key, 'content':text, 'paramsXML':paramsXML}) 
-		f = urllib.urlopen(CALAIS_URL, param) 
-		response = f.read() 
-		dom = minidom.parseString(response) 
-		rdfdoc = dom.childNodes[0].childNodes[0].nodeValue 
-		rdf = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#") 
-		c = Namespace("http://s.opencalais.com/1/pred/") 
-		g = Graph() 
-		g.parse(StringIO(rdfdoc.encode('utf-8'))) 
-		for so in g.subject_objects(c["name"]):
-			(hash, lit) = so
-			name = lit.title()
-			hash = hash.title().split("/")[-1]
-			thing = {'name': name, 'hash': hash}
-			self.things[hash] = thing
-		for so in g.subject_objects(rdf["type"]):
-			(hash, lit) = so
-			hash = hash.title().split("/")[-1]
-			if self.things.has_key(hash):
-				self.things[hash]["type"] = lit.title().split("/")[-1]
+__version__ = "1.0"
 
-	def print_things(self): 
-		"""
-		Prints the terms from the last extraction.  
-		"""
-		for (hash, thing) in self.things.items(): 
-			print "%s :: %s (%s)" % (hash, thing["name"], thing["type"])
-			
-	def analyze_url(self, url):
-		"""
-		Downloads HTML from the given URL and submits it to OpenCalais for analysis.  
-		"""
-		f = urllib.urlopen(url)
-		html = f.read()
-		self.analyze(html, "text/html")
+class Calais():
+    api_key = None
+    processing_directives = {"contentType":"TEXT/RAW", "outputFormat":"application/json", "reltagBaseURL":None, "calculateRelevanceScore":"true", "enableMetadataType":None, "discardMetadata":None}
+    user_directives = {"allowDistribution":"false", "allowSearch":"false", "externalID":None}
+    external_metadata = {}
+    _last_doc = None
+    _last_result = None
 
-	def getURLAnalysis(self, url, outputFormat):
-		"""
-		Downloads HTML from given URL, submits it to OpenCalais for analysis, with results supplied in given format.
-		"""
-		f=urllib.urlopen(url)
-		html = f.read()
-		return self.getAnalysis(html, "text/html",outputFormat)
+    def __init__(self, api_key, submitter="python-calais client v.%s" % __version__):
+        self.api_key = api_key
+        self.user_directives["submitter"]=submitter
 
-	def getAnalysis(self, text, content_type="text/txt", outputFormat="XML/RDF"):
-		"""
-		Submits 'text' to OpenCalais for analysis and returns 'response' in chosen format.  'content_type' defaults to 'text/txt'.  Set it to 'text/html' if you are submitting HTML data. 
-		'outputFormat' defaults to "XML/RDF".
-		"""
-		externalID = self.content_id(text)
-		paramsXML = PARAMS_XML % (content_type, outputFormat, self.allow_distro, self.allow_search, externalID, self.submitter) 
-		param = urllib.urlencode({'licenseID':self.api_key, 'content':text, 'paramsXML':paramsXML}) 
-		f = urllib.urlopen(CALAIS_URL, param) 
-		response = f.read()
-		return response
+    def _get_params_XML(self):
+        return PARAMS_XML % (" ".join('c:%s="%s"' % (k,v) for (k,v) in self.processing_directives.items() if v), " ".join('c:%s="%s"' % (k,v) for (k,v) in self.user_directives.items() if v), " ".join('c:%s="%s"' % (k,v) for (k,v) in self.external_metadata.items() if v))
+
+    def rest_POST(self, content):
+        params = urllib.urlencode({'licenseID':self.api_key, 'content':content, 'paramsXML':self._get_params_XML()})
+        headers = {"Content-type":"application/x-www-form-urlencoded"}
+        conn = httplib.HTTPConnection("api.opencalais.com:80")
+        conn.request("POST", "/enlighten/rest/", params, headers)
+        response = conn.getresponse()
+        data = response.read()
+        conn.close()
+        return (data)
+
+    def get_random_id(self):
+        """
+        Creates a random 10-character ID for your submission.  
+        """
+        import string
+        from random import choice
+        chars = string.letters + string.digits
+        np = ""
+        for i in range(10):
+            np = np + choice(chars)
+        return np
+
+    def get_content_id(self, text):
+        """
+        Creates a SHA1 hash of the text of your submission.  
+        """
+        import hashlib
+        h = hashlib.sha1()
+        h.update(text)
+        return h.hexdigest()
+
+    def analyze(self, content, content_type="TEXT/RAW", external_id=None):
+        self.processing_directives["contentType"]=content_type
+        if external_id:
+            self.user_directives["externalID"] = external_id
+        result = json.load(StringIO(self.rest_POST(content)))
+        self._last_doc = result['doc']
+        self._last_result = self.simplify_json(result)
+        return self._last_result
+
+    def analyze_url(self, url):
+        f = urllib.urlopen(url)
+        html = f.read()
+        return self.analyze(html, content_type="TEXT/HTML", external_id=url)
+
+    def simplify_json(self, json):
+        result = {}
+        for element in json.values():
+            for k,v in element.items():
+                if isinstance(v, unicode) and v.startswith("http://") and json.has_key(v):
+                    element[k] = json[v]
+        for k, v in json.items():
+            if v.has_key("_typeGroup"):
+                group = v["_typeGroup"]
+                if not result.has_key(group):
+                    result[group]=[]
+                del v["_typeGroup"]
+                v["__reference"] = k
+                result[group].append(v)
+        return result
+
+    def print_summary(self):
+        info = self._last_doc['info']
+        print "Calais Request ID: %s" % info['calaisRequestID']
+        if info.has_key('externalID'): 
+            print "External ID: %s" % info['externalID']
+        if info.has_key('docTitle'):
+            print "Title: %s " % info['docTitle']
+        print "Language: %s" % self._last_doc['meta']['language']
+        print "Extractions: "
+        for k,v in self._last_result.items():
+            print "\t%d %s" % (len(v), k)
+
+    def print_entities(self):
+        if self._last_result.has_key('entities'):
+            for item in self._last_result['entities']:
+                print "%s: %s (%.2f)" % (item['_type'], item['name'], item['relevance'])
+        else:
+            print "Result has no entities."
+
+    def print_topics(self):
+        if self._last_result.has_key('topics'):
+            for topic in self._last_result['topics']:
+                print topic['categoryName']
+        else:
+            print "Result has no topics."
+
+    def print_relations(self):
+        if self._last_result.has_key('relations'):
+            for relation in self._last_result['relations']:
+                print relation['_type']
+                for k,v in relation.items():
+                    if not k.startswith("_"):
+                        if isinstance(v, unicode):
+                            print "\t%s:%s" % (k,v)
+                        elif isinstance(v, dict) and v.has_key('name'):
+                            print "\t%s:%s" % (k, v['name'])
+        else:
+            print "Result has no relations."

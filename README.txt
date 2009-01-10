@@ -40,7 +40,7 @@ PersonPolitical
 >>> print result.entities[0]
 {u'_type': u'Person', u'name': u'Barack Obama', '__reference': u'http://d.opencalais.com/pershash-1/cfcf1aa2-de05-3939-a7d5-10c9c7b3e87b', u'instances': [{u'suffix': u' is the new President of the United States', u'prefix': u'of the UnitedStates of America until 2009.  ', u'detection': u'[of the United States of America until 2009.  ]Barack Obama[ is the new President of the United States]', u'length': 12, u'offset': 75, u'exact': u'Barack Obama'}], u'relevance': 0.28599999999999998, u'nationality': u'N/A', u'resolutions': [], u'persontype': u'political'}
 >>> result2 = calais.analyze_url("http://www.bestofsicily.com/mafia.htm")
->>> calais.print_summary()
+>>> result2.print_summary()
 Calais Request ID: 87f09ffe-0643-48e1-855e-7abebf315300
 External ID: http://www.bestofsicily.com/mafia.htm
 Title: The Mafia in Sicilian History, Sicilian Corruption, the European Commission

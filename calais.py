@@ -1,7 +1,7 @@
 """
-python-calais v.1.0 -- Python interface to the OpenCalais API
+python-calais v.1.1 -- Python interface to the OpenCalais API
 Author: Jordan Dimov (jdimov@mlke.net)
-Last-Update: 01/09/2009
+Last-Update: 01/10/2009
 """
 
 import httplib, urllib
@@ -12,15 +12,16 @@ PARAMS_XML = """
 <c:params xmlns:c="http://s.opencalais.com/1/pred/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"> <c:processingDirectives %s> </c:processingDirectives> <c:userDirectives %s> </c:userDirectives> <c:externalMetadata %s> </c:externalMetadata> </c:params>
 """
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 class Calais():
+    """
+    Python class that knows how to talk to the OpenCalais API.  Use the analyze() and analyze_url() methods, which return CalaisResponse objects.  
+    """
     api_key = None
     processing_directives = {"contentType":"TEXT/RAW", "outputFormat":"application/json", "reltagBaseURL":None, "calculateRelevanceScore":"true", "enableMetadataType":None, "discardMetadata":None, "omitOutputtingOriginalText":"true"}
     user_directives = {"allowDistribution":"false", "allowSearch":"false", "externalID":None}
     external_metadata = {}
-    _last_doc = None
-    _last_result = None
 
     def __init__(self, api_key, submitter="python-calais client v.%s" % __version__):
         self.api_key = api_key
@@ -64,18 +65,31 @@ class Calais():
         self.processing_directives["contentType"]=content_type
         if external_id:
             self.user_directives["externalID"] = external_id
-        result = json.load(StringIO(self.rest_POST(content)))
-        self._last_doc = result['doc']
-        self._last_result = self.simplify_json(result)
-        return self._last_result
+        return CalaisResponse(self.rest_POST(content))
 
     def analyze_url(self, url):
         f = urllib.urlopen(url)
         html = f.read()
         return self.analyze(html, content_type="TEXT/HTML", external_id=url)
 
-    def simplify_json(self, json):
+
+class CalaisResponse():
+    """
+    Encapsulates a parsed Calais response and provides easy pythonic access to the data.
+    """
+    raw_response = None
+    simplified_response = None
+    
+    def __init__(self, raw_result):
+        self.raw_response = json.load(StringIO(raw_result))
+        self.simplified_response = self._simplify_json(self.raw_response)
+        self.__dict__['doc'] = self.raw_response['doc']
+        for k,v in self.simplified_response.items():
+            self.__dict__[k] = v
+
+    def _simplify_json(self, json):
         result = {}
+        # First, resolve references
         for element in json.values():
             for k,v in element.items():
                 if isinstance(v, unicode) and v.startswith("http://") and json.has_key(v):
@@ -91,40 +105,31 @@ class Calais():
         return result
 
     def print_summary(self):
-        info = self._last_doc['info']
+        info = self.doc['info']
         print "Calais Request ID: %s" % info['calaisRequestID']
         if info.has_key('externalID'): 
             print "External ID: %s" % info['externalID']
         if info.has_key('docTitle'):
             print "Title: %s " % info['docTitle']
-        print "Language: %s" % self._last_doc['meta']['language']
+        print "Language: %s" % self.doc['meta']['language']
         print "Extractions: "
-        for k,v in self._last_result.items():
+        for k,v in self.simplified_response.items():
             print "\t%d %s" % (len(v), k)
 
     def print_entities(self):
-        if self._last_result.has_key('entities'):
-            for item in self._last_result['entities']:
-                print "%s: %s (%.2f)" % (item['_type'], item['name'], item['relevance'])
-        else:
-            print "Result has no entities."
+        for item in self.entities:
+            print "%s: %s (%.2f)" % (item['_type'], item['name'], item['relevance'])
 
     def print_topics(self):
-        if self._last_result.has_key('topics'):
-            for topic in self._last_result['topics']:
-                print topic['categoryName']
-        else:
-            print "Result has no topics."
+        for topic in self.topics:
+            print topic['categoryName']
 
     def print_relations(self):
-        if self._last_result.has_key('relations'):
-            for relation in self._last_result['relations']:
-                print relation['_type']
-                for k,v in relation.items():
-                    if not k.startswith("_"):
-                        if isinstance(v, unicode):
-                            print "\t%s:%s" % (k,v)
-                        elif isinstance(v, dict) and v.has_key('name'):
-                            print "\t%s:%s" % (k, v['name'])
-        else:
-            print "Result has no relations."
+        for relation in self.relations:
+            print relation['_type']
+            for k,v in relation.items():
+                if not k.startswith("_"):
+                    if isinstance(v, unicode):
+                        print "\t%s:%s" % (k,v)
+                    elif isinstance(v, dict) and v.has_key('name'):
+                        print "\t%s:%s" % (k, v['name'])

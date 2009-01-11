@@ -1,7 +1,7 @@
 """
-python-calais v.1.1 -- Python interface to the OpenCalais API
+python-calais v.1.2 -- Python interface to the OpenCalais API
 Author: Jordan Dimov (jdimov@mlke.net)
-Last-Update: 01/10/2009
+Last-Update: 01/11/2009
 """
 
 import httplib, urllib
@@ -12,7 +12,7 @@ PARAMS_XML = """
 <c:params xmlns:c="http://s.opencalais.com/1/pred/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"> <c:processingDirectives %s> </c:processingDirectives> <c:userDirectives %s> </c:userDirectives> <c:externalMetadata %s> </c:externalMetadata> </c:params>
 """
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 class Calais():
     """
@@ -62,6 +62,8 @@ class Calais():
         return h.hexdigest()
 
     def analyze(self, content, content_type="TEXT/RAW", external_id=None):
+        if not content:
+            return None
         self.processing_directives["contentType"]=content_type
         if external_id:
             self.user_directives["externalID"] = external_id
@@ -117,14 +119,20 @@ class CalaisResponse():
             print "\t%d %s" % (len(v), k)
 
     def print_entities(self):
+        if not hasattr(self, "entities"):
+            return None
         for item in self.entities:
             print "%s: %s (%.2f)" % (item['_type'], item['name'], item['relevance'])
 
     def print_topics(self):
+        if not hasattr(self, "topics"):
+            return None
         for topic in self.topics:
             print topic['categoryName']
 
     def print_relations(self):
+        if not hasattr(self, "relations"):
+            return None
         for relation in self.relations:
             print relation['_type']
             for k,v in relation.items():

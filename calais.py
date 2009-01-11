@@ -1,10 +1,10 @@
 """
-python-calais v.1.2 -- Python interface to the OpenCalais API
+python-calais v.1.3 -- Python interface to the OpenCalais API
 Author: Jordan Dimov (jdimov@mlke.net)
-Last-Update: 01/11/2009
+Last-Update: 01/12/2009
 """
 
-import httplib, urllib
+import httplib, urllib, re
 import simplejson as json
 from StringIO import StringIO
 
@@ -12,7 +12,9 @@ PARAMS_XML = """
 <c:params xmlns:c="http://s.opencalais.com/1/pred/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"> <c:processingDirectives %s> </c:processingDirectives> <c:userDirectives %s> </c:userDirectives> <c:externalMetadata %s> </c:externalMetadata> </c:params>
 """
 
-__version__ = "1.2"
+STRIP_RE = re.compile('<script.*?</script>|<noscript.*?</noscript>|<style.*?</style>', re.IGNORECASE)
+
+__version__ = "1.3"
 
 class Calais():
     """
@@ -71,7 +73,8 @@ class Calais():
 
     def analyze_url(self, url):
         f = urllib.urlopen(url)
-        html = f.read()
+        html = f.read().replace('\n', '')
+        html = STRIP_RE.sub('', html)
         return self.analyze(html, content_type="TEXT/HTML", external_id=url)
 
 
@@ -83,7 +86,10 @@ class CalaisResponse():
     simplified_response = None
     
     def __init__(self, raw_result):
-        self.raw_response = json.load(StringIO(raw_result))
+        try:
+            self.raw_response = json.load(StringIO(raw_result))
+        except:
+            raise ValueError(raw_result)
         self.simplified_response = self._simplify_json(self.raw_response)
         self.__dict__['doc'] = self.raw_response['doc']
         for k,v in self.simplified_response.items():

@@ -1,4 +1,4 @@
-python-calais v.1.3 -- Python interface to the OpenCalais API
+python-calais v.1.4 -- Python interface to the OpenCalais API
 
 This Python module is a wrapper around the OpenCalais API as documented at http://www.opencalais.com/calaisAPI by Reuters. It makes REST calls to the OpenCalais API via HTTP POST, then parses and simplifies the JSON responses returned by OpenCalais. You can then access the response data in a much more pythonic manner.
 

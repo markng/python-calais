@@ -1,5 +1,5 @@
 """
-python-calais v.1.3 -- Python interface to the OpenCalais API
+python-calais v.1.4 -- Python interface to the OpenCalais API
 Author: Jordan Dimov (jdimov@mlke.net)
 Last-Update: 01/12/2009
 """
@@ -14,7 +14,7 @@ PARAMS_XML = """
 
 STRIP_RE = re.compile('<script.*?</script>|<noscript.*?</noscript>|<style.*?</style>', re.IGNORECASE)
 
-__version__ = "1.3"
+__version__ = "1.4"
 
 class Calais():
     """
@@ -63,6 +63,11 @@ class Calais():
         h.update(text)
         return h.hexdigest()
 
+    def preprocess_html(self, html):
+        html = html.replace('\n', '')
+        html = STRIP_RE.sub('', html)
+        return html
+
     def analyze(self, content, content_type="TEXT/RAW", external_id=None):
         if not (content and  len(content.strip())):
             return None
@@ -73,10 +78,28 @@ class Calais():
 
     def analyze_url(self, url):
         f = urllib.urlopen(url)
-        html = f.read().replace('\n', '')
-        html = STRIP_RE.sub('', html)
+        html = self.preprocess_html(f.read())
         return self.analyze(html, content_type="TEXT/HTML", external_id=url)
 
+    def analyze_file(self, fn):
+        import mimetypes
+        try:
+            filetype = mimetypes.guess_type(fn)[0]
+        except:
+            raise ValueError("Can not determine file type for '%s'" % fn)
+        if filetype == "text/plain":
+            content_type="TEXT/RAW"
+            f = open(fn)
+            content = f.read()
+            f.close()
+        elif filetype == "text/html":
+            content_type = "TEXT/HTML"
+            f = open(fn)
+            content = self.preprocess_html(f.read())
+            f.close()
+        else:
+            raise ValueError("Only plaintext and HTML files are currently supported.  ")
+        return self.analyze(content, content_type=content_type, external_id=fn)
 
 class CalaisResponse():
     """

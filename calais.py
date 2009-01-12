@@ -64,7 +64,7 @@ class Calais():
         return h.hexdigest()
 
     def analyze(self, content, content_type="TEXT/RAW", external_id=None):
-        if not content:
+        if not (content and  len(content.strip())):
             return None
         self.processing_directives["contentType"]=content_type
         if external_id:
@@ -113,6 +113,8 @@ class CalaisResponse():
         return result
 
     def print_summary(self):
+        if not hasattr(self, "doc"):
+            return None
         info = self.doc['info']
         print "Calais Request ID: %s" % info['calaisRequestID']
         if info.has_key('externalID'): 

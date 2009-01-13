@@ -16,6 +16,10 @@ STRIP_RE = re.compile('<script.*?</script>|<noscript.*?</noscript>|<style.*?</st
 
 __version__ = "1.4"
 
+class AppURLopener(urllib.FancyURLopener):
+    version = "Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.0.5) Gecko/2008121623 Ubuntu/8.10 (intrepid)Firefox/3.0.5" # Lie shamelessly to Wikipedia.
+urllib._urlopener = AppURLopener()
+
 class Calais():
     """
     Python class that knows how to talk to the OpenCalais API.  Use the analyze() and analyze_url() methods, which return CalaisResponse objects.  

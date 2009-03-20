@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from setuptools import setup
-import calais
- 
+
 setup(name='calais',
       py_modules = ['calais'],
       description='Python interface to the OpenCalais API',
